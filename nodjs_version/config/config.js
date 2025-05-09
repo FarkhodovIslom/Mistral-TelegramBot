@@ -1,4 +1,5 @@
-require('dotenv').config;
+import dotenv from 'dotenv';
+dotenv.config();
 
 const config = {
     port: process.env.PORT || 3125,
@@ -9,4 +10,4 @@ const config = {
     mistral_api: process.env.MISTRAL_API_KEY,
 }
 
-module.exports = config;
+export default config;
