@@ -1,58 +1,61 @@
-// Импортируем необходимые библиотеки
-import { Telegraf } from 'telegraf';
-import { MistralClient } from '@mistralai/mistralai';
-import config from './config/config.js';
-import dotenv from 'dotenv';
-dotenv.config();
+const { Telegraf } = require('telegraf');
+const axios = require('axios');
+const fs = require('fs');
 
-// Config,jsdan tokenlarni olamiz
-const TELEGRAM_TOKEN = config.telegram_token;
-const MISTRAL_API_KEY = config.mistral_api;
 
-// Инициализация клиентов
-const bot = new Telegraf(TELEGRAM_TOKEN);
-const mistralClient = new MistralClient(MISTRAL_API_KEY);
+const BOT_TOKEN = '7427597393:AAEtwiwp4qBOdAo6S_0BrUp9ZqP_PZAL2tY';
+const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
+const MISTRAL_API_KEY = 'IJakwoNHBhDJYVuR1uWjen5OG860IVKd';
 
-//  Mistral APIni konfiguratsiyasi
-const MODEL = 'mistral-medium'; // model-tiny, model-small bor yana bundan tezroq
 
-// /start comandasi
+const MODEL_NAME = 'mistral-small';
+
+const bot = new Telegraf(BOT_TOKEN);
+
 bot.start((ctx) => {
-  ctx.reply('Привет! Я бот, который использует API Mistral для ответов на твои вопросы. Просто напиши мне что-нибудь!');
+    ctx.reply('Welcome! Send me a message, and I will process it using the Mistral API.');
 });
 
-// /help
-bot.help((ctx) => {
-  ctx.reply('Отправь мне любое сообщение, и я отвечу с помощью Mistral AI.');
-});
+const systemPrompt = `
+    Your name is Ergash. 
+`
 
-// Text zaprosla uchun 
 bot.on('text', async (ctx) => {
-  try {
-    // Typing yozuvini ko'rsatish uchun
-    await ctx.telegram.sendChatAction(ctx.chat.id, 'typing');
-    
     const userMessage = ctx.message.text;
+    try {
+        const response = await axios.post(
+            MISTRAL_API_URL,
+            {
+                model: MODEL_NAME,
+                messages: [
+                    {role: 'system', content: systemPrompt},
+                    { role: 'user', content: userMessage }
+                ]
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+        console.log(response.data);
+
+        const mistralResponse = response.data.choices && response.data.choices.length > 0
+            ? response.data.choices[0].message.content
+            : 'bot javob qaytarmadi.';
+        ctx.reply(mistralResponse, { parse_mode: 'Markdown' });
+        console.log(`User: ${ctx.from.username} | Message: ${userMessage}`);
+        console.log(`Bot: ${mistralResponse}`);
+    } catch (error) {
+        console.error('Error communicating with Mistral API:', error);
+        ctx.reply('Kechirasiz qanqadir error bor');
+    }
+
     
-    // Mistral APIdan responsni qabul qilamiz
-    const response = await mistralClient.chat({
-      model: MODEL,
-      messages: [{role: 'system', content: ''}, { role: 'user', content: userMessage }],
-    });
-    
-    // Userga javobni jonatamiz
-    await ctx.reply(response.choices[0].message.content);
-  } catch (error) {
-    console.error('Ошибка при обработке сообщения:', error);
-    await ctx.reply('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.');
-  }
 });
 
-// Botti ishga tushiramiz
-bot.launch()
-  .then(() => console.log('Бот запущен!'))
-  .catch((err) => console.error('Ошибка запуска бота:', err));
+bot.launch();
 
-// Instanceni terminate qilish uchun 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
